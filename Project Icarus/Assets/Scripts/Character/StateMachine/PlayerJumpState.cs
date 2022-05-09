@@ -57,7 +57,6 @@ public class PlayerJumpState : PlayerBaseState, IRootState
     void HandleJump()
     {
         Ctx.Animator.SetBool(Ctx.IsJumpingHash, true);
-        Ctx.IsJumping = true;
 
         Ctx.CurrentMovementY = 3.0f;
         Ctx.AppliedMovementY = 3.0f;

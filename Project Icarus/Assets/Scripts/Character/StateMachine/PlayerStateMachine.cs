@@ -25,9 +25,13 @@ public class PlayerStateMachine : MonoBehaviour
     bool _isMovementPressed;
     bool _isRunPressed;
 
+    //Speed Settings
+
+    float _runMultiplier = 4.0f;
+    float _walkMultiplier = 2.0f;
+
     //Constants
     float _rotationFactorPerFrame = 15.0f;
-    float _runMultiplier = 4.0f;
     int _zero = 0;
 
     //Gravity Variables
@@ -35,10 +39,6 @@ public class PlayerStateMachine : MonoBehaviour
 
     //Jumping Variables
     bool _isJumpPressed = false;
-    float _initialJumpVelocity;
-    float _maxJumpHeight = 4.0f;
-    float _maxJumpTime = .75f;
-    bool _isJumping = false;
     bool _requireNewJumpPress = false;
 
 
@@ -55,7 +55,6 @@ public class PlayerStateMachine : MonoBehaviour
     public int IsWalkingHash { get { return _isWalkingHash;} }
     public int IsRunningHash { get { return _isRunningHash; } }
     public bool RequireNewJumpPress { get { return _requireNewJumpPress; } set { _requireNewJumpPress = value; } }
-    public bool IsJumping { set { _isJumping = value; } }
     public bool IsJumpPressed { get { return _isJumpPressed; } }
     public bool IsMovementPressed { get { return _isMovementPressed; } }
     public bool IsRunPressed { get { return _isRunPressed; } }
@@ -66,6 +65,7 @@ public class PlayerStateMachine : MonoBehaviour
     public float AppliedMovementX { get { return _appliedMovement.x; } set { _appliedMovement.x = value;} }
     public float AppliedMovementZ { get { return _appliedMovement.z; } set { _appliedMovement.z = value; } }
     public float RunMultiplier { get { return _runMultiplier; } set { _runMultiplier = value; } }
+    public float WalkMultiplier { get { return _walkMultiplier; } set { _walkMultiplier = value; } }
     public Vector2 CurrentMovementInput { get { return _currentMovementInput; } set { _currentMovementInput = value; } }
     
     void Awake()
