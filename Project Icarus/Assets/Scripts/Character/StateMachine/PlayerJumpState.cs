@@ -58,8 +58,8 @@ public class PlayerJumpState : PlayerBaseState, IRootState
     {
         Ctx.Animator.SetBool(Ctx.IsJumpingHash, true);
 
-        Ctx.CurrentMovementY = 3.0f;
-        Ctx.AppliedMovementY = 3.0f;
+        Ctx.CurrentMovementY = Ctx.JumpStrength;
+        Ctx.AppliedMovementY = Ctx.JumpStrength;
     }
 
     public void HandleGravity()

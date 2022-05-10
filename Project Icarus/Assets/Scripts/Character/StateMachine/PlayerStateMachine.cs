@@ -29,6 +29,7 @@ public class PlayerStateMachine : MonoBehaviour
 
     float _runMultiplier = 4.0f;
     float _walkMultiplier = 2.0f;
+    float _jumpStrength = 7.5f;
 
     //Constants
     float _rotationFactorPerFrame = 15.0f;
@@ -58,6 +59,7 @@ public class PlayerStateMachine : MonoBehaviour
     public bool IsJumpPressed { get { return _isJumpPressed; } }
     public bool IsMovementPressed { get { return _isMovementPressed; } }
     public bool IsRunPressed { get { return _isRunPressed; } }
+    public float JumpStrength { get { return _jumpStrength; } set { _jumpStrength = value; } }
     public float Gravity { get { return _gravity; } }
     public float CurrentMovementY { get { return _currentMovement.y; } set { _currentMovement.y = value; } }
     public float CurrentMovementX { get { return _currentMovement.x; } set { _currentMovement.x = value; } }
@@ -81,9 +83,10 @@ public class PlayerStateMachine : MonoBehaviour
         _currentState.EnterState(); //enters it
 
         //Parameter hash references - makes it easier for the animator to reffer to variables
-        _isWalkingHash = Animator.StringToHash("isWalking");
-        _isRunningHash = Animator.StringToHash("isRunning");
-        _isJumpingHash = Animator.StringToHash("isJumping");
+        _isWalkingHash = Animator.StringToHash("IsWalking");
+        _isRunningHash = Animator.StringToHash("IsRunning");
+        _isJumpingHash = Animator.StringToHash("IsJumping");
+        _isFallingHash = Animator.StringToHash("IsFalling");
 
         //Set player input callbacks - makes sure character inputs function as expected
         _playerInput.CharacterControls.Move.started += OnMovementInput;
@@ -95,12 +98,6 @@ public class PlayerStateMachine : MonoBehaviour
         _playerInput.CharacterControls.Jump.canceled += OnJump;
     }
 
-    // Start is called before the first frame update
-    void Start()
-    {
-        
-    }
-
     // Update is called once per frame
     void Update()
     {
@@ -109,9 +106,11 @@ public class PlayerStateMachine : MonoBehaviour
         //Invoke current state logic
         _currentState.UpdateStates();
 
+
         //Moves the character at the end of applied movement
         _cc.Move(_appliedMovement * Time.deltaTime);
     }
+
 
     void HandleRotation()
     {
