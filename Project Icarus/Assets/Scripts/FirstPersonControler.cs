@@ -255,7 +255,7 @@ public class FirstPersonControler : MonoBehaviour
         //If all checks are good, do the interact
         if (Input.GetKeyDown(interactKey) && currentInteractable != null && Physics.Raycast(playerCamera.ViewportPointToRay(interactionRayPoint), out RaycastHit hit, interactionDistance, interactionLayer))
         {
-            currentInteractable.OnInteract();
+            currentInteractable.OnInteract(this);
         }
     }
 
@@ -311,4 +311,11 @@ public class FirstPersonControler : MonoBehaviour
 
         duringCrouchAnimation = false;
     }
+
+    #region public methods
+    public void UpdatePosition(Vector3 newPosition)
+    {
+        characterController.Move(newPosition);
+    }
+    #endregion
 }

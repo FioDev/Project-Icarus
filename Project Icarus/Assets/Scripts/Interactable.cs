@@ -9,7 +9,7 @@ public abstract class Interactable : MonoBehaviour
         gameObject.layer = 8; 
         //8 is the index of the "interactable" layer. If this changes, this needs to change too - or everything breaks
     }
-    public abstract void OnInteract();
+    public abstract void OnInteract(FirstPersonControler interactor);
     public abstract void OnFocus();
     public abstract void OnLoseFocus();
 }
