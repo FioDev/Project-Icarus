@@ -19,11 +19,13 @@ public class FirstPersonControler : MonoBehaviour
     [SerializeField] private bool canJump = true;
     [SerializeField] private bool canCrouch = true;
     [SerializeField] private bool canSlide = true;
+    [SerializeField] private bool canInteract = true;
 
     [Header("Controls")]
     [SerializeField] private KeyCode sprintKey = KeyCode.LeftShift;
     [SerializeField] private KeyCode jumpKey = KeyCode.Space;
     [SerializeField] private KeyCode crouchKey = KeyCode.LeftControl;
+    [SerializeField] private KeyCode interactKey = KeyCode.E;
 
     [Header("Movement Parameters")]
     [SerializeField] private float walkSpeed = 3.0f;
@@ -78,6 +80,13 @@ public class FirstPersonControler : MonoBehaviour
         }
     }
 
+    //Interaction perams
+    [Header("Interaction Perameters")]
+    [SerializeField] private Vector3 interactionRayPoint = default;
+    [SerializeField] private float interactionDistance = default;
+    [SerializeField] private LayerMask interactionLayer = default;
+    private Interactable currentInteractable;
+
     //private reference variables
     private Camera playerCamera;
     private CharacterController characterController;
@@ -131,6 +140,12 @@ public class FirstPersonControler : MonoBehaviour
         if (canUseHeadbob)
         {
             HandleHeadbob();
+        }
+
+        if (canInteract)
+        {
+            HandleInteractionCheck();
+            HandleInteractionInput();
         }
 
         //Apply movement
@@ -198,6 +213,49 @@ public class FirstPersonControler : MonoBehaviour
                 defaultCamYPos + Mathf.Sin(timer) * (isCrouching ? crouchBobAmount : isSprinting ? sprintBobAmount : walkBobAmount) * bobStrengthMultiplier,
                 playerCamera.transform.localPosition.z
                 );
+        }
+    }
+
+    //Constantly raycast for interactable objects within range
+    private void HandleInteractionCheck()
+    {
+        //This considers all colliders
+        //GAIN FOCUS
+        Debug.DrawRay(playerCamera.ViewportPointToRay(interactionRayPoint).origin, playerCamera.ViewportPointToRay(interactionRayPoint).direction, Color.red, interactionDistance);
+        if(Physics.Raycast(playerCamera.ViewportPointToRay(interactionRayPoint), out RaycastHit hit, interactionDistance))
+        {
+            //"if theres an object on layer 8 (an interactable)
+            if (hit.collider.gameObject.layer == 8) 
+            {
+                //...*and* check that either the current interactable is null, *OR* the interactable being hovered over and the one currently selected arent the same
+                if (currentInteractable == null || hit.collider.gameObject.GetInstanceID() != currentInteractable.gameObject.GetInstanceID())
+                {
+                    //If that's passed, run the code
+                    //Save the interactable from this collider to "current Interactable"
+                    hit.collider.TryGetComponent(out currentInteractable);
+
+                    //If we do indeed now have an interactable, focus it (as it is the first frame)
+                    if (currentInteractable != null)
+                    {
+                        currentInteractable.OnFocus();
+                    }
+                }
+            }
+        } else if (currentInteractable) //LOSE FOCUS - if we have an interactable and the raycast fails to hit *any* interactable, its lost focus
+        {
+            currentInteractable.OnLoseFocus();
+            currentInteractable = null;
+        }
+    }
+
+    //This will be "interact key" for some form of action
+    private void HandleInteractionInput()
+    {
+        //if we have key down, and interact isnt null, raycast it out from the camera on layer Interactable Layer
+        //If all checks are good, do the interact
+        if (Input.GetKeyDown(interactKey) && currentInteractable != null && Physics.Raycast(playerCamera.ViewportPointToRay(interactionRayPoint), out RaycastHit hit, interactionDistance, interactionLayer))
+        {
+            currentInteractable.OnInteract();
         }
     }
 
