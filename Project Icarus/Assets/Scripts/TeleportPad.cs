@@ -5,6 +5,7 @@ using UnityEngine;
 public class TeleportPad : Interactable
 {
     [Header("Teleporter Settings")]
+    [SerializeField] private bool useRelative;
     [SerializeField] private Vector3 coordinates;
     
     
@@ -16,7 +17,9 @@ public class TeleportPad : Interactable
 
     public override void OnInteract(FirstPersonControler interactor)
     {
-        interactor.UpdatePosition(coordinates);
+        Vector3 destination = useRelative ? coordinates + interactor.transform.position : coordinates;
+
+        interactor.UpdatePosition(destination);
     }
 
     public override void OnLoseFocus()

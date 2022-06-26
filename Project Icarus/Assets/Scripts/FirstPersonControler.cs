@@ -6,6 +6,8 @@ public class FirstPersonControler : MonoBehaviour
 {
     //Toggle for can move, defaults to true
     public bool CanMove { get; private set; } = true;
+
+
     //Only true if cansprint and sprint key is down
     private bool isSprinting => canSprint && Input.GetKey(sprintKey);
     private bool shouldJump => Input.GetKeyDown(jumpKey) && characterController.isGrounded;
@@ -42,6 +44,7 @@ public class FirstPersonControler : MonoBehaviour
     [Header("Jumping Parameters")]
     [SerializeField] private float jumpForce = 8.0f;
     [SerializeField] private float gravity = 9.8f;
+    private bool groundedLastFrame = true;
 
     [Header("Crouch Parameters")]
     [SerializeField] private float crouchHeight = 0.5f;
@@ -153,6 +156,8 @@ public class FirstPersonControler : MonoBehaviour
 
     }
 
+    #region movement methods
+
     private void HandleMovementInput()
     {
         //Checks if is sprinting, if yes, multiply by sprint speed. If no, by walk speed, also crouch speed
@@ -259,12 +264,27 @@ public class FirstPersonControler : MonoBehaviour
         }
     }
 
+#endregion
+
     private void ApplyFinalMovement()
     {
         //Do gravity
         if (!characterController.isGrounded)
         {
             moveDirection.y -= (gravity * Time.deltaTime);
+            groundedLastFrame = false;
+        }
+        //Kill Y movement when you hit the floor, only on the next frame.
+        //Update: killing Y movement entirely makes unity forget the chracter controler is touching the ground
+        //Solution: Make it dt * gravity, so that there is a *tiny* bit of Y movement, but SET it to that, not add it as you do in "not grounded"
+        //That way, the ground is "within" the skin width of the character controler
+        //REASON THIS IS NEEDED: If you dont set it to this, and have the groundedLastFrame bool trigger between this, you get an acumulating amount of negative y momentum
+        //This is because the "target" y movement does not reset when you touch the ground.
+        //Adendum: i hate floating point inaccuracy
+        if (characterController.isGrounded && !groundedLastFrame)
+        {
+            moveDirection.y = -(gravity * Time.deltaTime);
+            groundedLastFrame = true;
         }
 
         //Slope code
@@ -276,6 +296,8 @@ public class FirstPersonControler : MonoBehaviour
         characterController.Move(moveDirection * Time.deltaTime);
 
     }
+
+    #region coroutines
 
     private IEnumerator CrouchStand()
     {
@@ -294,7 +316,7 @@ public class FirstPersonControler : MonoBehaviour
         Vector3 currentCentre = characterController.center;
 
         //Over the time of "time to crouch", defined above, lerp from whatever current height is, to whatever height should be
-        while(timeElapsed < timeToCrouch)
+        while (timeElapsed < timeToCrouch)
         {
             characterController.height = Mathf.Lerp(currentHeight, targetHeight, timeElapsed / timeToCrouch);
             characterController.center = Vector3.Lerp(currentCentre, targetCentre, timeElapsed / timeToCrouch);
@@ -312,10 +334,16 @@ public class FirstPersonControler : MonoBehaviour
         duringCrouchAnimation = false;
     }
 
+    #endregion
+
+
     #region public methods
     public void UpdatePosition(Vector3 newPosition)
     {
-        characterController.Move(newPosition);
+        //Flashes cc on, then off, and in the in between, changes the position
+        characterController.enabled = false;
+        transform.position = newPosition;
+        characterController.enabled = true;
     }
     #endregion
 }
