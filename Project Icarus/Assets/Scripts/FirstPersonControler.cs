@@ -93,6 +93,7 @@ public class FirstPersonControler : MonoBehaviour
     [SerializeField] private float sprintSpeed = 6.0f;
     [SerializeField] private float crouchSpeed = 1.5f;
     [SerializeField] private float slopeSpeed = 8;
+    [SerializeField] private float responsivness = 10;
 
     [Header("Look Parameters")]
     [SerializeField, Range(1, 10)] private float lookSpeedX = 2.0f;
@@ -166,6 +167,7 @@ public class FirstPersonControler : MonoBehaviour
 
     //movement
     private Vector3 moveDirection;
+    private Vector3 finalMovement = Vector3.zero;
     private Vector2 currentInput;
 
     //crouching
@@ -270,10 +272,25 @@ public class FirstPersonControler : MonoBehaviour
     {
         if (shouldDoubleJump)
         {
-            moveDirection.y = jumpForce * doubleJumpStrengthMultipliar;
+            //apply "dash" movement on doublejump
+            if (doubleJumpAsDash)
+            {
+                //Normalises move direction, gets the planar form of it, multiplies it by jumpforce, and then multiplies that by DJ Strength * 5
+                Vector2 temp = new Vector2(moveDirection.normalized.x * jumpForce * (doubleJumpStrengthMultipliar * 5), moveDirection.normalized.z * jumpForce * (doubleJumpStrengthMultipliar * 5));
+
+                moveDirection.y = jumpForce;
+
+                finalMovement = new Vector3(temp.x, moveDirection.y, temp.y);
+            } else
+            {
+                moveDirection.y = jumpForce * doubleJumpStrengthMultipliar;
+            }
+            
+            
             currentExtraJumps--;
         }
     }
+
 
     private void HandleCrouch()
     {
@@ -391,6 +408,26 @@ public class FirstPersonControler : MonoBehaviour
         }
     }
 
+    private void SmoothMovement()
+    {
+        //Affect only X and Z movement. Leave y movement as is.
+        
+        //Cache y movement
+        float yCache = moveDirection.y;
+
+        //cache current Planar movement
+        Vector2 planarMovement = new Vector2(moveDirection.x, moveDirection.z);
+
+        //Cache final planar movement
+        Vector2 finalPlanarMovement = new Vector2(finalMovement.x, finalMovement.z);
+
+        //lerp from final to current over dt, then reapply vertical movement
+        finalPlanarMovement = Vector2.Lerp(finalPlanarMovement, planarMovement, Time.deltaTime * responsivness);
+
+        //Apply final movement directly from yCache rather than finalMovement.y
+        finalMovement = new Vector3(finalPlanarMovement.x, yCache, finalPlanarMovement.y);
+    }
+
     #endregion
 
     private void ApplyFinalMovement()
@@ -405,7 +442,11 @@ public class FirstPersonControler : MonoBehaviour
             moveDirection += new Vector3(hitPointNormal.x, -hitPointNormal.y, hitPointNormal.z) * slopeSpeed;
         }
 
-        characterController.Move(moveDirection * Time.deltaTime);
+        //Smooth movement from MoveDirection into FinalMovement
+        SmoothMovement();
+
+        //apply
+        characterController.Move(finalMovement * Time.deltaTime);
 
     }
 

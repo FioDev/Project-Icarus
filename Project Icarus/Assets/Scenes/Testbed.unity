@@ -803,6 +803,7 @@ MonoBehaviour:
   canFly: 1
   canSwim: 1
   canDoubleJump: 1
+  canDash: 1
   sprintKey: 304
   jumpKey: 32
   crouchKey: 306
@@ -811,6 +812,7 @@ MonoBehaviour:
   sprintSpeed: 6
   crouchSpeed: 1.5
   slopeSpeed: 8
+  responsivness: 15
   lookSpeedX: 2
   lookSpeedY: 2
   upperLookLimit: 80
@@ -830,7 +832,7 @@ MonoBehaviour:
   crouchBobAmount: 0.025
   bobStrengthMultiplier: 0.5
   bobSpeedMultiplier: 1
-  doubleJumpAsDash: 0
+  doubleJumpAsDash: 1
   maxExtraJumps: 1
   doubleJumpRecoveryMode: 0
   doubleJumpStaminaCost: 1
@@ -838,6 +840,8 @@ MonoBehaviour:
   doubleJumpWindow: 1
   doubleJumpMinHeightOffGround: 1
   doubleJumpStrengthMultipliar: 1.5
+  dashInputWindow: 0.5
+  dashSpeed: 15
   interactionRayPoint: {x: 0.5, y: 0.5, z: 0}
   interactionDistance: 2
   interactionLayer:
