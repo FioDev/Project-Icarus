@@ -2,8 +2,24 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
+
+
 public class FirstPersonControler : MonoBehaviour
 {
+    private enum DoubleJumpRecoveryMode
+    {
+        OnGround,
+        OverTime,
+        UsingStamina
+    }
+
+    private enum DoubleJumpWindow
+    {
+        Ascending,
+        Descending,
+        HeightAboveGround
+    }
+
     //Toggle for can move, defaults to true
     public bool CanMove { get; private set; } = true;
 
@@ -12,6 +28,46 @@ public class FirstPersonControler : MonoBehaviour
     private bool isSprinting => canSprint && Input.GetKey(sprintKey);
     private bool shouldJump => Input.GetKeyDown(jumpKey) && characterController.isGrounded;
     private bool shouldCrouch => Input.GetKeyDown(crouchKey) && !duringCrouchAnimation && characterController.isGrounded;
+    private bool shouldDoubleJump
+    {
+        get
+        {
+            //Basic Checks
+            if (Input.GetKeyDown(jumpKey) && !characterController.isGrounded && currentExtraJumps > 0)
+            {
+                switch (doubleJumpWindow)
+                {
+                    case DoubleJumpWindow.Ascending:
+                        if (moveDirection.y > 0)
+                        {
+                            return true;
+                        } else
+                        {
+                            return false;
+                        }
+                    
+                    case DoubleJumpWindow.Descending:
+                        if (moveDirection.y <= 0)
+                        {
+                            return true;
+                        } else 
+                        { 
+                            return false; 
+                        }
+
+                    case DoubleJumpWindow.HeightAboveGround:
+                        if (Physics.Raycast(transform.position, Vector3.down, characterController.height + doubleJumpMinHeightOffGround))
+                        {
+                            return true;
+                        } else
+                        {
+                            return false;
+                        }
+                }
+            }
+            return false;
+        }
+    }
 
     [Header("Aesthetic Options")]
     [SerializeField] private bool canUseHeadbob = true;
@@ -22,6 +78,9 @@ public class FirstPersonControler : MonoBehaviour
     [SerializeField] private bool canCrouch = true;
     [SerializeField] private bool canSlide = true;
     [SerializeField] private bool canInteract = true;
+    [SerializeField] private bool canFly = true;
+    [SerializeField] private bool canSwim = true;
+    [SerializeField] private bool canDoubleJump = true;
 
     [Header("Controls")]
     [SerializeField] private KeyCode sprintKey = KeyCode.LeftShift;
@@ -64,6 +123,17 @@ public class FirstPersonControler : MonoBehaviour
     [SerializeField, Range(0, 5)] private float bobSpeedMultiplier = 1f;
     private float defaultCamYPos = 0;
     private float timer;
+
+    [Header("Double Jump Parameters")]
+    [SerializeField] private bool doubleJumpAsDash = false;
+    [SerializeField] private int maxExtraJumps = 1;
+    [SerializeField] private DoubleJumpRecoveryMode doubleJumpRecoveryMode = DoubleJumpRecoveryMode.OnGround; //When double jump will return
+    [SerializeField] private float doubleJumpStaminaCost = 1f;
+    [SerializeField] private float doubleJumpTimeToRecover = 1f;
+    [SerializeField] private DoubleJumpWindow doubleJumpWindow = DoubleJumpWindow.Descending;
+    [SerializeField] private float doubleJumpMinHeightOffGround = 1f;
+    [SerializeField, Range(0.5f, 3)] private float doubleJumpStrengthMultipliar = 1f;
+    private int currentExtraJumps = 1;
 
     //Sliding params
     private Vector3 hitPointNormal; //Angle of the floor below slide
@@ -135,6 +205,11 @@ public class FirstPersonControler : MonoBehaviour
             HandleJump();
         }
 
+        if (canDoubleJump)
+        {
+            HandleDoubleJump();
+        }
+
         if (canCrouch)
         {
             HandleCrouch();
@@ -188,6 +263,15 @@ public class FirstPersonControler : MonoBehaviour
         if (shouldJump)
         {
             moveDirection.y = jumpForce;
+        }
+    }
+
+    private void HandleDoubleJump()
+    {
+        if (shouldDoubleJump)
+        {
+            moveDirection.y = jumpForce * doubleJumpStrengthMultipliar;
+            currentExtraJumps--;
         }
     }
 
@@ -264,9 +348,7 @@ public class FirstPersonControler : MonoBehaviour
         }
     }
 
-#endregion
-
-    private void ApplyFinalMovement()
+    private void HandleGravity()
     {
         //Do gravity
         if (!characterController.isGrounded)
@@ -286,6 +368,36 @@ public class FirstPersonControler : MonoBehaviour
             moveDirection.y = -(gravity * Time.deltaTime);
             groundedLastFrame = true;
         }
+    }
+
+    private void RecoverDoubleJumps()
+    {
+        switch (doubleJumpRecoveryMode)
+        {
+            case DoubleJumpRecoveryMode.OverTime:
+                StartCoroutine(RecoverDoubleJumpOverTime());
+                break;
+
+            case DoubleJumpRecoveryMode.UsingStamina:
+                //TODO: IMPLEMENT STAMINA SYSTEM.
+                break;
+
+            case DoubleJumpRecoveryMode.OnGround:
+                if (characterController.isGrounded)
+                {
+                    currentExtraJumps = maxExtraJumps;
+                }
+                break;
+        }
+    }
+
+    #endregion
+
+    private void ApplyFinalMovement()
+    {
+        HandleGravity();
+
+        RecoverDoubleJumps();
 
         //Slope code
         if (canSlide && isSliding)
@@ -298,6 +410,27 @@ public class FirstPersonControler : MonoBehaviour
     }
 
     #region coroutines
+
+    private IEnumerator RecoverDoubleJumpOverTime()
+    {
+        float timeElapsed = 0f;
+        //Wait set time
+        while (timeElapsed < doubleJumpTimeToRecover)
+        {
+            timeElapsed += Time.deltaTime;
+            yield return null;
+        }
+        //Add a jump
+        currentExtraJumps++;
+        
+        //If not full yet, recurse.
+        if (currentExtraJumps < maxExtraJumps)
+        {
+            StartCoroutine(RecoverDoubleJumpOverTime());
+        }
+
+        yield break;
+    }
 
     private IEnumerator CrouchStand()
     {

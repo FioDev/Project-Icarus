@@ -800,6 +800,9 @@ MonoBehaviour:
   canCrouch: 1
   canSlide: 1
   canInteract: 1
+  canFly: 1
+  canSwim: 1
+  canDoubleJump: 1
   sprintKey: 304
   jumpKey: 32
   crouchKey: 306
@@ -827,6 +830,14 @@ MonoBehaviour:
   crouchBobAmount: 0.025
   bobStrengthMultiplier: 0.5
   bobSpeedMultiplier: 1
+  doubleJumpAsDash: 0
+  maxExtraJumps: 1
+  doubleJumpRecoveryMode: 0
+  doubleJumpStaminaCost: 1
+  doubleJumpTimeToRecover: 1
+  doubleJumpWindow: 1
+  doubleJumpMinHeightOffGround: 1
+  doubleJumpStrengthMultipliar: 1.5
   interactionRayPoint: {x: 0.5, y: 0.5, z: 0}
   interactionDistance: 2
   interactionLayer:
