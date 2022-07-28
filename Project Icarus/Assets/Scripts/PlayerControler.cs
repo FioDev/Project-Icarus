@@ -15,7 +15,8 @@ public enum SpeedType
     Sprint,
     Run,
     Walk,
-    Crouch
+    Crouch,
+    Swim
 }
 
 public class PlayerControler : MonoBehaviour
@@ -65,6 +66,7 @@ public class PlayerControler : MonoBehaviour
 
     [Header("--Gameplay Toggles--")]
     [SerializeField] private bool canInteract;
+    [SerializeField] private bool canUseGravity;
     [SerializeField] private bool canMoveCamera;
 
     #endregion
@@ -80,8 +82,13 @@ public class PlayerControler : MonoBehaviour
     [SerializeField] private int maxDoubleJumps;
     [SerializeField] private FlightTypes flightType;
 
-    [Header("Movement Slide Responsivity")]
+    [Header("Physics Perameters")]
     [SerializeField] private float movementSensitivity = 1.0f;
+    [SerializeField] private float airMovementAuthority = 0.25f;
+    [SerializeField] private float gravity = -9.8f;
+    [SerializeField] private float groundDrag = 1.1f;
+    [SerializeField] private float bounceLimiter = 3;
+    [SerializeField] private float liquidBouyancy = 1f;
 
     [Header("movement speed Perameters")]
     [SerializeField] private float moveSpeed;
@@ -101,16 +108,155 @@ public class PlayerControler : MonoBehaviour
     [SerializeField, Range(1, 180)] private float lowerLookLimit = 80.0f;
     #endregion
 
+    //Key bindings
+    #region key bindings
+    [Header("Controls")]
+    [SerializeField] private bool useAnalogueMovement;
+    [SerializeField] private KeyCode movementForward;
+    [SerializeField] private KeyCode movementBackward;
+    [SerializeField] private KeyCode movementRight;
+    [SerializeField] private KeyCode movementLeft;
+    [SerializeField] private KeyCode movementJump;
+    [SerializeField] private KeyCode movementCrouch;
+    [SerializeField] private KeyCode movementWalk;
+    [SerializeField] private KeyCode movementSprint;
+    [SerializeField] private KeyCode primaryAction;
+    [SerializeField] private KeyCode secondaryAction;
+    [SerializeField] private KeyCode interaction;
+
+    #endregion
+
     //Storage variables
     #region storage variables
-    private float rotationX = 0;
+    private float rotationX = 0; //camera rotation vertical
+
     private Vector3 currentMovement = Vector3.zero; //The actual current movement of the players character
     private Vector2 oldHorizontalMovement = Vector2.zero; //The "last frame" 2D value stored in "Current movement"
     private Vector2 targetMovement = Vector2.zero; //The ideal target movement of the player's character
     private Vector3 horizontalInput = Vector3.zero; //Horizontal input rotated to be the correct orientation
     private Vector3 rawHorizontalInput = Vector3.zero; // the 2D input of the WASD keys ranging from 1 to -1
     private float currentTargetSpeed = 0f; //The speed to multiply horizontal input by to gain target movement
-    private SpeedType speedState = SpeedType.Walk;
+
+    private SpeedType speedState = SpeedType.Walk; //Speed type to apply to grounded(and some other) horizontal movement
+
+    private int currentDoubleJumps;
+
+    //bounce variables
+    private bool shouldBounce = false;
+    private ControllerColliderHit bounceHit;
+
+    private bool movementKeysDown
+    {
+        get
+        {
+            //analogue clause
+            if (useAnalogueMovement)
+            {
+                if (rawHorizontalInput == Vector3.zero)
+                {
+                    return false;
+                } else
+                {
+                    return true;
+                }
+            }
+
+            if (Input.GetKey(movementLeft))
+            {
+                return true;
+            }
+
+            if (Input.GetKey(movementRight))
+            {
+                return true;
+            }
+
+            if (Input.GetKey(movementForward))
+            {
+                return true;
+            }
+
+            if (Input.GetKey(movementBackward))
+            {
+                return true;
+            }
+
+            return false;
+        }
+    }
+
+    private bool shouldApplyDrag
+    {
+        get
+        {
+            //input check. If input is being given, do not drag.
+            if (movementKeysDown)
+            {
+                return false;
+            }
+
+            //else, ground check
+            //If on ground, do drag, else do not
+            if (characterController.isGrounded)
+            {
+                return true;
+            }
+
+            return false;
+
+        }
+    }
+
+    private bool shouldJump
+    {
+        get
+        {
+            //guard clause - If no double jump, assume case is "only on ground"
+            if (!canDoubleJump)
+            {
+                if (characterController.isGrounded)
+                {
+                    return true;
+                }
+                else return false;
+            }
+
+            //else, check double jump charges
+            if (currentDoubleJumps != 0)
+            {
+                return true;
+            }
+
+            return false;
+        }
+    }
+
+    //water / swim variables
+    private bool isSwimming = false;
+    private bool touchingWater = false; //Holds wether water is being touched
+    private Collider waterTouched; //Holds the collider of the water being touched
+    private float surfaceYValue;
+    private float sinkRate;
+    private bool shouldSwim
+    {
+        get
+        {
+            //Out of water clause, do not swim
+            if (!touchingWater)
+            {
+                return false;
+            }
+
+            //Water not deep enough, return false and do not swim
+            if (Vector3.Distance(waterTouched.ClosestPoint(transform.position), transform.position) > 0.1f)
+            {
+                return false;
+            }
+
+            //Else, swim
+            return true;
+        }
+    }
 
 
     #endregion
@@ -135,15 +281,42 @@ public class PlayerControler : MonoBehaviour
             HandleMouseLook();
         }
 
+        //bounce check
+        if (shouldBounce)
+        {
+            HandleAirBounce(bounceHit);
+        }
+
+        //Handle Swim Checks
+        if (canSwim)
+        {
+            HandleSwim();
+        }
+
         //Handle Movement
         if (canMove)
         {
             GetHorizontalInput();
             HandleMovement();
         }
+
+        if (canUseGravity)
+        {
+            HandleGravity();
+        }
+
+        //Handle Jump
+        if (canJump)
+        {
+            HandleJump();
+        }
+
+
+        ApplyFinalMovement();
+
     }
 
-    #region Initial Movement Helpers
+    #region Initial Movement Input Helpers
     private void HandleMouseLook()
     {
         //up and down camera
@@ -158,26 +331,106 @@ public class PlayerControler : MonoBehaviour
 
     private void GetHorizontalInput()
     {
-        rawHorizontalInput = new Vector2(Input.GetAxis("Vertical"), Input.GetAxis("Horizontal"));
+        //Analogue / Keyboard movement check / movemement gathering
+        if (useAnalogueMovement)
+        {
+            rawHorizontalInput = new Vector2(Input.GetAxis("Vertical"), Input.GetAxis("Horizontal"));
+        } else
+        {
+            //Check which movement keys are applied
+            float x = 0;
+            float z = 0;
+
+            if (Input.GetKey(movementForward))
+            {
+                x = 1;
+            }
+
+            if (Input.GetKey(movementBackward))
+            {
+                x = -1;
+            }
+
+            if (Input.GetKey(movementRight))
+            {
+                z = 1;
+            }
+
+            if (Input.GetKey(movementLeft))
+            {
+                z = -1;
+            }
+
+            rawHorizontalInput.x = x;
+            rawHorizontalInput.y = z;
+        }
 
         horizontalInput = (transform.TransformDirection(Vector3.forward) * rawHorizontalInput.x) + (transform.TransformDirection(Vector3.right) * rawHorizontalInput.y);
-        horizontalInput = horizontalInput.normalized;
+        //horizontalInput = horizontalInput.normalized;
         horizontalInput.y = 0f;
     }
 
     #endregion
 
+    //If the character is in the air, bounce on all but the Y axis, and divide the speed by the bounce limiter
+    private void HandleAirBounce(ControllerColliderHit hit)
+    {
+        if (!characterController.isGrounded)
+        {
+            float yCache = currentMovement.y;
+            currentMovement = Vector3.Reflect(currentMovement, hit.normal) / bounceLimiter;
+            currentMovement.y = yCache;
+        }
+
+        //Then, reset the shouldBounce so that it doesnt double bounce on the next frame without due cause (the hit collider triggering again)
+        shouldBounce = false;
+    }
+
+    private void HandleSwim()
+    {
+        if (shouldSwim)
+        {
+            Debug.Log("swimming - TO DO - just imagine you are swimming rn");
+            isSwimming = true;
+
+        } else
+        {
+            isSwimming = false;
+        }
+    }
+
+    private void HandleJump()
+    {
+        //No jump if swimming
+        if (isSwimming)
+        {
+            return;
+        }
+
+        if (Input.GetKeyDown(movementJump) && shouldJump)
+        {
+            currentMovement.y = jumpForce;
+
+            //if using the double jump moddel, and not grounded, start reducing double jumps
+            if (canDoubleJump && !characterController.isGrounded)
+            {
+                currentDoubleJumps--;
+            }
+        }
+
+        if (characterController.isGrounded)
+        {
+            currentDoubleJumps = maxDoubleJumps;
+        }
+    }
+
     private void HandleMovement()
     {
-        HandleGravity();
-
+        //
         DetermineSpeedState();
 
         //Handles individual states of horizontal movement
         HandleHorizontalMovement();
-
-        ApplyFinalMovement();
-        
     }
 
     private void HandleHorizontalMovement()
@@ -203,6 +456,14 @@ public class PlayerControler : MonoBehaviour
                 currentTargetSpeed = crouchSpeed;
                 HandleCrouch();
                 break;
+
+
+        }
+
+        //Apply drag under circumstance
+        if (shouldApplyDrag)
+        {
+            HandleDrag();
         }
     }
 
@@ -252,6 +513,29 @@ public class PlayerControler : MonoBehaviour
 
     #endregion
 
+    private void HandleDrag()
+    {
+        targetMovement.x /= groundDrag;
+        targetMovement.y /= groundDrag;
+    }
+    private void HandleGravity()
+    {
+        //dont even TRY gravity if we're swimming rn
+        if (isSwimming)
+        {
+            return;
+        }
+
+        if (!characterController.isGrounded)
+        {
+            currentMovement.y += gravity * Time.deltaTime;
+        } else
+        {
+            //Sets to near-zero value, rather than zero
+            currentMovement.y = gravity * Time.deltaTime;
+        }
+    }
+
     private void HandleInteraction()
     {
         
@@ -267,7 +551,7 @@ public class PlayerControler : MonoBehaviour
     {
         if (canSprint)
         {
-            if (Input.GetKey(KeyCode.LeftShift))
+            if (Input.GetKey(movementSprint))
             {
                 speedState = SpeedType.Sprint;
                 return;
@@ -276,7 +560,7 @@ public class PlayerControler : MonoBehaviour
 
         if (canCrouch)
         {
-            if (Input.GetKey(KeyCode.LeftControl))
+            if (Input.GetKey(movementCrouch))
             {
                 speedState = SpeedType.Crouch;
                 return;
@@ -285,11 +569,17 @@ public class PlayerControler : MonoBehaviour
 
         if (canWalk)
         {
-            if (Input.GetKey(KeyCode.CapsLock))
+            if (Input.GetKey(movementWalk))
             {
                 speedState = SpeedType.Walk;
                 return;
             }
+        }
+
+        if (shouldSwim)
+        {
+            speedState = SpeedType.Swim;
+            return;
         }
 
         //TODO add cases for flight, swimming, etc
@@ -304,7 +594,8 @@ public class PlayerControler : MonoBehaviour
         oldHorizontalMovement.y = currentMovement.z;
 
         //Lerp between "real" horizontal motion and "target" horizontal motion, by deltatime * sensitivity
-        oldHorizontalMovement = Vector2.Lerp(oldHorizontalMovement, targetMovement, movementSensitivity * Time.deltaTime);
+        //Also multiplies movement sensitivity by the air movement authority *if* in the air, else, just multiplies by 1
+        oldHorizontalMovement = Vector2.Lerp(oldHorizontalMovement, targetMovement, (movementSensitivity * (characterController.isGrounded ? 1 : airMovementAuthority)) * Time.deltaTime);
 
         //apply to currentmovement, ignoring Y component
         currentMovement.x = oldHorizontalMovement.x;
@@ -313,5 +604,32 @@ public class PlayerControler : MonoBehaviour
         //Send to character controler
         characterController.Move(currentMovement * Time.deltaTime);
 
+    }
+
+    private void OnControllerColliderHit(ControllerColliderHit hit)
+    {
+        shouldBounce = true;
+        bounceHit = hit;
+    }
+
+    private void OnTriggerEnter(Collider other)
+    {
+        //check for water layer - water is layer 4
+        if (other.gameObject.layer == 4)
+        {
+            Debug.Log("entered water");
+            touchingWater = true;
+            waterTouched = other;
+        }
+    }
+
+    private void OnTriggerExit(Collider other)
+    {
+        //4 = water layer
+        if (other.gameObject.layer == 4)
+        {
+            touchingWater = false;
+            Debug.Log("Exited the water");
+        }
     }
 }
