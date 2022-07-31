@@ -549,6 +549,21 @@ public class PlayerControler : MonoBehaviour
 
     private void DetermineSpeedState()
     {
+
+        //Priorities (in order of Highest to Lowest)
+        //Fly (override ALL)
+        //Swim 
+        //sprint
+        //crouch
+        //walk
+        //run
+
+        if (shouldSwim)
+        {
+            speedState = SpeedType.Swim;
+            return;
+        }
+
         if (canSprint)
         {
             if (Input.GetKey(movementSprint))
@@ -576,17 +591,13 @@ public class PlayerControler : MonoBehaviour
             }
         }
 
-        if (shouldSwim)
-        {
-            speedState = SpeedType.Swim;
-            return;
-        }
 
-        //TODO add cases for flight, swimming, etc
+        //TODO add cases for flight, etc
 
         speedState = SpeedType.Run;
     }
 
+    //Movement finalisation
     private void ApplyFinalMovement()
     {
         //Cache current movement in old horizontal movement
@@ -605,6 +616,8 @@ public class PlayerControler : MonoBehaviour
         characterController.Move(currentMovement * Time.deltaTime);
 
     }
+
+    #region built in triggers / collisions
 
     private void OnControllerColliderHit(ControllerColliderHit hit)
     {
@@ -632,4 +645,7 @@ public class PlayerControler : MonoBehaviour
             Debug.Log("Exited the water");
         }
     }
+
+    #endregion
+
 }
